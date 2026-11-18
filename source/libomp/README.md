@@ -14,7 +14,7 @@ not claim starvation freedom or eventual barrier completion.
 
 ## Origin and scope
 
-The source is adapted from Specula's libomp case study. `upstream.json` pins the
+The source is adapted from Specular's libomp case study. `upstream.json` pins the
 original model and the LLVM implementation used by that study. It retains
 per-thread program counters, task identities and parents, task stealing,
 detachable tasks, external completion, cancellation, two task-team slots,

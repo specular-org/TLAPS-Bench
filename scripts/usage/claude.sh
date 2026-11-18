@@ -2,7 +2,7 @@
 #
 # Check Claude Max subscription usage via the OAuth usage endpoint.
 #
-# Ported from Specula (scripts/exp/usage.sh). Used by the benchmark runner's
+# Ported from Specular (scripts/exp/usage.sh). Used by the benchmark runner's
 # quota gate (src/evaluator/runner.py) and runnable standalone.
 #
 # Usage:

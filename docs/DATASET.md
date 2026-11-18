@@ -23,14 +23,14 @@ This file is generated; regenerate it with `python3 scripts/dataset_table.py`.
 | Example | Source | Proof completion | Proof from scratch | Total |
 |---|---|--:|--:|--:|
 | [CahillSSI](https://github.com/pron/amazon-snapshot-spec/blob/9c60cb18151889d7b4c0a4ffd7de0b6fc2db0fb2/serializableSnapshotIsolation.tla) | Cahill serializable snapshot isolation | – | 1 | 1 |
-| [HashicorpRaft](https://github.com/specula-org/specula-case-studies/tree/8885d2c0687d1e197f261585919718a035ce4464/systems/hashicorp-raft) | HashiCorp Raft (Specula) | – | 6 | 6 |
+| [HashicorpRaft](https://github.com/specular-org/specula-case-studies/tree/8885d2c0687d1e197f261585919718a035ce4464/systems/hashicorp-raft) | HashiCorp Raft (Specular) | – | 6 | 6 |
 | [hybrid_reliable_broadcast_cisa](https://github.com/kenmcmil/ivy/blob/master/examples/liveness/hybrid_reliable_broadcast_cisa.ivy) | Ivy liveness | – | 3 | 3 |
 | [alternating_bit_protocol](https://github.com/kenmcmil/ivy/blob/master/examples/liveness/alternating_bit_protocol.ivy) | Ivy liveness | – | 2 | 2 |
 | [ticket](https://github.com/kenmcmil/ivy/blob/master/examples/liveness/ticket.ivy) | Ivy liveness | – | 2 | 2 |
 | [ticket_nested](https://github.com/kenmcmil/ivy/blob/master/examples/liveness/ticket_nested.ivy) | Ivy liveness | – | 2 | 2 |
 | [tlb](https://github.com/kenmcmil/ivy/blob/master/examples/liveness/tlb.ivy) | Ivy liveness | – | 2 | 2 |
 | [split_queue_2_new](https://github.com/kenmcmil/ivy/blob/master/examples/liveness/split_queue_2_new.ivy) | Ivy liveness | – | 1 | 1 |
-| [libomp](https://github.com/specula-org/specula-case-studies/tree/8885d2c0687d1e197f261585919718a035ce4464/systems/libomp) | LLVM libomp (Specula) | – | 4 | 4 |
+| [libomp](https://github.com/specular-org/specula-case-studies/tree/8885d2c0687d1e197f261585919718a035ce4464/systems/libomp) | LLVM libomp (Specular) | – | 4 | 4 |
 | [CCF](https://github.com/microsoft/CCF/blob/6a2dc420f0166c93f92b773aa49c5203b0767750/tla/consensus/ccfraft.tla) | Microsoft CCF Raft | – | 2 | 2 |
 | [MongoDB](https://github.com/mongodb-labs/vldb25-dist-txns/blob/74526c1201109405172eb845413154f547a815ee/MultiShardTxn.tla) | MongoDB distributed transactions | – | 1 | 1 |
 | [OpenAddressing](https://github.com/lemmy/Examples/tree/mku-OA/specifications/TLC) | OpenAddressing | 1 | 5 | 6 |
@@ -57,7 +57,7 @@ This file is generated; regenerate it with `python3 scripts/dataset_table.py`.
 | [ZooKeeper_LowLevel](https://github.com/Disalg-ICS-NJU/zookeeper-tla-spec/tree/main/low-level-spec/zk-3.7) | ZooKeeper (Remix) | – | 9 | 9 |
 | [ben-or83](https://github.com/konnov/apalache-examples/tree/af360379b7cbcd1e16c1a801ff8ac64eb9aca038/ben-or83) | apalache-examples (Konnov) | 209 | – | 209 |
 | [tendermint](https://github.com/konnov/apalache-examples/tree/af360379b7cbcd1e16c1a801ff8ac64eb9aca038/tendermint) | apalache-examples (Konnov) | 48 | – | 48 |
-| [etcd_raft](https://github.com/specula-org/Specula/blob/main/skills/spec_generation/examples/etcdraft.tla) | etcd (Specula) | – | 9 | 9 |
+| [etcd_raft](https://github.com/specular-org/Specular/blob/main/skills/spec_generation/examples/etcdraft.tla) | etcd (Specular) | – | 9 | 9 |
 | [ewd998](https://github.com/tlaplus/Examples/tree/master/specifications/ewd998) | tlaplus/Examples | 52 | 7 | 59 |
 | [byzpaxos](https://github.com/tlaplus/Examples/tree/master/specifications/byzpaxos) | tlaplus/Examples | 41 | 11 | 52 |
 | [lamport_mutex](https://github.com/tlaplus/Examples/tree/master/specifications/lamport_mutex) | tlaplus/Examples | 20 | 2 | 22 |

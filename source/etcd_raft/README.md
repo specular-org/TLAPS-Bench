@@ -1,6 +1,6 @@
 # etcd Raft benchmark model
 
-The model is derived from the etcd Raft example distributed with Specula. Its eight safety theorem statements and task IDs are preserved. `MoreUpToDateCorrectInv` and `LeaderCompletenessInv` are corrected below; `CommitLiveness` adds a ninth target.
+The model is derived from the etcd Raft example distributed with Specular. Its eight safety theorem statements and task IDs are preserved. `MoreUpToDateCorrectInv` and `LeaderCompletenessInv` are corrected below; `CommitLiveness` adds a ninth target.
 
 The local constant-domain and pending-message repairs remain in place. The crash-recovery repair stores `logEntries` alongside the existing numeric `durableState[i].log` field in `InitDurableState` and `PersistState`. `Restart` restores the saved entries directly.
 

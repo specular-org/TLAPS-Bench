@@ -5,7 +5,7 @@
 Requirements: [uv](https://docs.astral.sh/uv/) and [Docker](https://docs.docker.com/get-docker/). Works on Linux x86-64 and Windows through WSL2; native Windows is not supported. macOS ARM works through Docker's emulation layer but is slower.
 
 ```bash
-git clone https://github.com/specula-org/tlaps-bench.git
+git clone https://github.com/specular-org/tlaps-bench.git
 cd tlaps-bench
 export OPENAI_API_KEY=sk-...
 uv run tlaps-bench run --dry-run

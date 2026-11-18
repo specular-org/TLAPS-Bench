@@ -22,7 +22,7 @@ abstraction. Their failures are not proof-capability evidence.
 
 ## Scope and provenance
 
-`upstream.json` pins the Specula model and the instrumented HashiCorp Raft
+`upstream.json` pins the Specular model and the instrumented HashiCorp Raft
 implementation examined by that case study. This is an adapted operational
 model with elections, log replication, independent heartbeats, log-disk stalls,
 single-server membership changes, deferred vote responses, and crash/restart.

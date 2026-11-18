@@ -46,7 +46,7 @@ def source_label(group):
     if group.startswith("ZooKeeper"):
         return "ZooKeeper (Remix)"
     if group == "etcd_raft":
-        return "etcd (Specula)"
+        return "etcd (Specular)"
     if group == "OpenAddressing":
         return "OpenAddressing"
     if group == "two_thread_mutex":
@@ -56,9 +56,9 @@ def source_label(group):
     if group == "CahillSSI":
         return "Cahill serializable snapshot isolation"
     if group == "HashicorpRaft":
-        return "HashiCorp Raft (Specula)"
+        return "HashiCorp Raft (Specular)"
     if group == "libomp":
-        return "LLVM libomp (Specula)"
+        return "LLVM libomp (Specular)"
     if group == "PirateShip":
         return "PirateShip consensus"
     if group == "DiskStateQueue":
@@ -75,19 +75,19 @@ SOURCE_URL = {
     "Microsoft CCF Raft": "https://github.com/microsoft/CCF/tree/6a2dc420f0166c93f92b773aa49c5203b0767750/tla/consensus",
     "PirateShip consensus": "https://github.com/PirateshipOrg/pirateship-tla",
     "WALs on S3 (Vanlightly)": "https://github.com/Vanlightly/s3-wal-collection",
-    "HashiCorp Raft (Specula)": "https://github.com/hashicorp/raft",
+    "HashiCorp Raft (Specular)": "https://github.com/hashicorp/raft",
     "tlaplus/Examples": "https://github.com/tlaplus/Examples",
     "TLAPS distribution examples": "https://github.com/tlaplus/tlapm",
     "ZooKeeper (Remix)": "https://arxiv.org/abs/2409.14301",
     "Ivy liveness": "https://github.com/kenmcmil/ivy",
     "apalache-examples (Konnov)": "https://github.com/konnov/apalache-examples",
-    "etcd (Specula)": "https://github.com/specula-org",
+    "etcd (Specular)": "https://github.com/specular-org",
     "OpenAddressing": "https://github.com/lemmy/Examples",
     "two_thread_mutex (Anvil)": "https://github.com/anvil-verifier/anvil/blob/main/src/tla_demo.rs",
     "MongoDB distributed transactions": "https://github.com/mongodb-labs/vldb25-dist-txns",
     "Cahill serializable snapshot isolation": "https://github.com/pron/amazon-snapshot-spec",
     "TLC disk state queue": "https://github.com/tlaplus/tlaplus",
-    "LLVM libomp (Specula)": "https://github.com/specula-org/specula-case-studies/tree/main/systems/libomp",
+    "LLVM libomp (Specular)": "https://github.com/specular-org/specula-case-studies/tree/main/systems/libomp",
 }
 
 
@@ -114,8 +114,8 @@ _GROUP_URL = {
     "SlateDBWAL": "https://github.com/Vanlightly/s3-wal-collection/blob/06d5cc60990cf8e5995dc56f28e5d56128eca227/slatedb/SlateDBWAL.tla",
     "OSWALD": "https://github.com/Vanlightly/s3-wal-collection/blob/06d5cc60990cf8e5995dc56f28e5d56128eca227/oswald/Oswald.tla",
     "Walgit": "https://github.com/Vanlightly/s3-wal-collection/blob/06d5cc60990cf8e5995dc56f28e5d56128eca227/walgit/Walgit.tla",
-    "HashicorpRaft": "https://github.com/specula-org/specula-case-studies/tree/8885d2c0687d1e197f261585919718a035ce4464/systems/hashicorp-raft",
-    "libomp": "https://github.com/specula-org/specula-case-studies/tree/8885d2c0687d1e197f261585919718a035ce4464/systems/libomp",
+    "HashicorpRaft": "https://github.com/specular-org/specula-case-studies/tree/8885d2c0687d1e197f261585919718a035ce4464/systems/hashicorp-raft",
+    "libomp": "https://github.com/specular-org/specula-case-studies/tree/8885d2c0687d1e197f261585919718a035ce4464/systems/libomp",
     "Consensus": "https://github.com/tlaplus/tlapm/tree/main/examples_draft/consensus",
     "Data": "https://github.com/tlaplus/tlapm/tree/main/zenon/regression/examples/data",
     # The current tlapm tree no longer keeps every module in these groups
@@ -125,7 +125,7 @@ _GROUP_URL = {
     "Euclid": "https://github.com/hengxin/tlaps-examples/tree/master/Euclid",
     "AtomicBakery": "https://github.com/hengxin/tlaps-examples/tree/master/AtomicBakery",
     "Record": "https://github.com/hengxin/tlaps-examples/tree/master/Record",
-    "etcd_raft": "https://github.com/specula-org/Specula/blob/main/skills/spec_generation/examples/etcdraft.tla",
+    "etcd_raft": "https://github.com/specular-org/Specular/blob/main/skills/spec_generation/examples/etcdraft.tla",
     "OpenAddressing": "https://github.com/lemmy/Examples/tree/mku-OA/specifications/TLC",
     "ZooKeeper": "https://github.com/Disalg-ICS-NJU/zookeeper-tla-spec/blob/main/high-level-spec/Zab.tla",
     "ZooKeeper_LowLevel": "https://github.com/Disalg-ICS-NJU/zookeeper-tla-spec/tree/main/low-level-spec/zk-3.7",
