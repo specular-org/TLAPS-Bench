@@ -2,7 +2,7 @@
 
 Source: [pron/amazon-snapshot-spec](https://github.com/pron/amazon-snapshot-spec/tree/9c60cb18151889d7b4c0a4ffd7de0b6fc2db0fb2),
 written by Chris Newcombe for HPTS 2011. The benchmark candidate was proposed
-in [issue #145](https://github.com/specula-org/tlaps-bench/issues/145).
+in [issue #145](https://github.com/specular-org/tlaps-bench/issues/145).
 
 `CahillSerializability.tla` supplies one Proof From Scratch target:
 

@@ -324,8 +324,8 @@ https://github.com/konnov/apalache-examples
     (http://www.apache.org/licenses/LICENSE-2.0), and the full text is in
     LICENSES/Apache-2.0.txt.
 
-etcd / Specula  —  benchmark group etcd_raft
-    From the Specula etcd-raft reference model (https://github.com/specula-org),
+etcd / Specular  —  benchmark group etcd_raft
+    From the Specular etcd-raft reference model (https://github.com/specular-org),
     derived from the raft TLA+ specification in etcd
     (https://github.com/etcd-io/etcd). Copyright 2024 The etcd Authors;
     licensed under the Apache License, Version 2.0
@@ -339,19 +339,19 @@ AbstractRaft  —  unvalidated proof exercise
     "In Search of an Understandable Consensus Algorithm", USENIX ATC 2014.
 
 
-LLVM libomp / Specula — benchmark group libomp
-    Repaired TLA+ barrier/tasking model adapted from the Specula case study:
-    https://github.com/specula-org/specula-case-studies/tree/8885d2c0687d1e197f261585919718a035ce4464/systems/libomp
+LLVM libomp / Specular — benchmark group libomp
+    Repaired TLA+ barrier/tasking model adapted from the Specular case study:
+    https://github.com/specular-org/specula-case-studies/tree/8885d2c0687d1e197f261585919718a035ce4464/systems/libomp
     The case study analyzed llvm/llvm-project at commit
     5b1eed6278de1fffa195978b017039add70a94e3 (openmp/runtime/src).
     LLVM implementation files are referenced for behavioral provenance and are
     not bundled. Source pins and the benchmark's operational repairs are recorded
     in source/libomp/upstream.json and source/libomp/README.md.
 
-HashiCorp Raft / Specula — benchmark group HashicorpRaft
-    Repaired TLA+ model adapted from the Specula case study:
-    https://github.com/specula-org/specula-case-studies/tree/8885d2c0687d1e197f261585919718a035ce4464/systems/hashicorp-raft
-    Implementation reference: specula-org/hashicorp-raft at
+HashiCorp Raft / Specular — benchmark group HashicorpRaft
+    Repaired TLA+ model adapted from the Specular case study:
+    https://github.com/specular-org/specula-case-studies/tree/8885d2c0687d1e197f261585919718a035ce4464/systems/hashicorp-raft
+    Implementation reference: specular-org/hashicorp-raft at
     b8265ccdffa1d60b8355123c252a1f2889b0a9ac, derived from hashicorp/raft.
     Implementation files are referenced, not bundled. Model changes, selected
     safety properties, validation limits, and source hashes are documented in

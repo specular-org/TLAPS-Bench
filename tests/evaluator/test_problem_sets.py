@@ -101,7 +101,7 @@ def test_readme_current_matches_collection_and_retired_showcases_a_subset(pfs_mo
             assert members
             assert members <= set(collections[name].tasks)
     assert collections["next"].tasks == ("CCF/CCFProof.tla", "PirateShip/PirateShipProof.tla")
-    assert collections["next"].pending == (("Wildfire", "https://github.com/specula-org/TLAPS-Bench/pull/164"),)
+    assert collections["next"].pending == (("Wildfire", "https://github.com/specular-org/TLAPS-Bench/pull/164"),)
 
 
 @pytest.mark.parametrize(
@@ -151,7 +151,7 @@ def test_next_reports_pending_wildfire_before_backend_setup(dry_run, preview_onl
     assert exc.value.code == 2
     error = capsys.readouterr().err
     assert "has no runnable tasks" in error
-    assert "pending merge: Wildfire (https://github.com/specula-org/TLAPS-Bench/pull/164)" in error
+    assert "pending merge: Wildfire (https://github.com/specular-org/TLAPS-Bench/pull/164)" in error
 
 
 def test_next_previews_ccf_and_pirateship_without_backend_setup(preview_only, capsys):
