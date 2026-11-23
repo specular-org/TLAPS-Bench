@@ -9,6 +9,9 @@ from pathlib import Path
 
 import pytest
 
+from common.task_contract import load_task_manifest, parse_editable_regions
+from evaluator.modes.proof_from_scratch import ProofFromScratch
+
 REPO = Path(__file__).resolve().parents[2]
 LIB = REPO / "lib"
 
@@ -116,21 +119,50 @@ INVARIANTS Rejected Replaced IndexBounds
     assert "128 distinct states found" in output
 
 
-@pytest.mark.parametrize("scenario", ["interrupted", "activated", "early-commit", "late-commit"])
-def test_confirmed_history(tmp_path, scenario):
+@pytest.fixture(scope="module", params=["source", "module", "PrefixConsistency", "Agreement"])
+def confirmed_history_task(request):
     if not shutil.which("java") or not (LIB / "tla2tools.jar").is_file():
         pytest.skip("TLC dependencies are not installed")
-    for module in ["FastLeaderElection", "ZkV3_7_0"]:
-        shutil.copy(REPO / f"source/ZooKeeper_LowLevel/{module}.tla", tmp_path)
-    shutil.copy(REPO / "tests/fixtures/zookeeper_sync/ConfirmedHistoryReplay.tla", tmp_path)
+    task = request.param
+    root = REPO / "benchmark"
+    group = "ZooKeeper_LowLevel"
+    module = "ZkV3_7_0"
+    invariants = (
+        "Leadership1 Leadership2 PrefixConsistency Integrity Agreement TotalOrder "
+        "LocalPrimaryOrder GlobalPrimaryOrder PrimaryIntegrity"
+    )
+    if task == "source":
+        files = [REPO / "source" / group / name for name in (f"{module}.tla", "FastLeaderElection.tla")]
+        invariants += " TypeOK"
+    elif task == "module":
+        mode = ProofFromScratch(str(root), "/checker")
+        target = Path(mode.benchmark_dir()) / group / f"{module}.tla"
+        files = [target, *mode.get_dependencies(str(target))]
+    else:
+        module = f"{module}_{task}"
+        flat = load_task_manifest(
+            root / "proof-from-scratch", suite_name="proof-from-scratch", parse_task_regions=parse_editable_regions
+        )
+        target = flat[f"{group}/{module}.tla"]
+        files = [target.task_path, *target.context_paths]
+        invariants = task
+    return module, files, invariants
+
+
+@pytest.mark.parametrize("scenario", ["interrupted", "activated", "early-commit", "late-commit"])
+def test_confirmed_history(tmp_path, scenario, confirmed_history_task):
+    module, files, invariants = confirmed_history_task
+    for path in files:
+        shutil.copy(path, tmp_path)
+    fixture = (REPO / "tests/fixtures/zookeeper_sync/ConfirmedHistoryReplay.tla").read_text()
+    (tmp_path / "ConfirmedHistoryReplay.tla").write_text(fixture.replace("EXTENDS ZkV3_7_0\n", f"EXTENDS {module}\n"))
     config = f'''SPECIFICATION TraceSpec
 CONSTANTS B=B C=C D=D E=E T=T Server={{B,C,D,E,T}} NullPoint=NullPoint MAXEPOCH=3
 Scenario="{scenario}"
 Value <- RequestValues
 CHECK_DEADLOCK FALSE
 PROPERTY Spec Completed KeepsConfirmed
-INVARIANTS TypeOK ServingMatches Checkpoints Leadership1 Leadership2 PrefixConsistency
-           Integrity Agreement TotalOrder LocalPrimaryOrder GlobalPrimaryOrder PrimaryIntegrity
+INVARIANTS ServingMatches Checkpoints {invariants}
 '''
     (tmp_path / "ConfirmedHistoryReplay.cfg").write_text(config)
     cp = os.pathsep.join(str(LIB / name) for name in ["tla2tools.jar", "community", "tlapm"])

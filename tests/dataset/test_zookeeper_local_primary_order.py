@@ -23,10 +23,9 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-LOW_LEVEL_SOURCE = REPO_ROOT / "source" / "ZooKeeper_LowLevel" / "ZkV3_7_0.tla"
 LPO_FILES = (
     REPO_ROOT / "source" / "ZooKeeper" / "Zab.tla",
-    LOW_LEVEL_SOURCE,
+    REPO_ROOT / "source" / "ZooKeeper_LowLevel" / "ZkV3_7_0.tla",
     REPO_ROOT / "benchmark" / "proof-from-scratch" / "ZooKeeper" / "Zab_LocalPrimaryOrderDefs.tla",
     REPO_ROOT / "benchmark" / "proof-from-scratch" / "ZooKeeper_LowLevel" / "ZkV3_7_0_LocalPrimaryOrderDefs.tla",
 )
@@ -55,7 +54,7 @@ def test_local_primary_order_quantifies_over_every_broadcast_pair():
         body = _local_primary_order_body(path.read_text(encoding="utf-8"))
         assert EXISTS_PAIR not in body, f"{path} still uses existential pair quantification"
         assert FORALL_PAIR in body, f"{path} is missing forall-pairs LocalPrimaryOrder"
-        bound = "Len(confirmedHistory[j])" if path == LOW_LEVEL_SOURCE else "lastCommitted[j].index"
+        bound = "Len(confirmedHistory[j])" if path.parent.name == "ZooKeeper_LowLevel" else "lastCommitted[j].index"
         assert f"{bound} >= 2" not in body, f"{path} still skips followers with just one delivery"
         assert rf"(\E idx \in 1..{bound}" in body, (
             f"{path} must parenthesize the delivery check so \\E does not bind =>"

@@ -1,7 +1,11 @@
 # ZooKeeper 3.7 synchronization model
 
-The nine safety targets are unchanged. This revision repairs synchronization
-and recovery behavior exposed by a reachable incomplete-SNAP execution.
+The low-level model has nine safety targets. Installing a snapshot replaces
+the follower's local `history` and moves its `lastCommitted` cursor. The delivery
+predicates read `confirmedHistory`, which records transaction identities at
+leader activation, follower UPTODATE and ordinary commits. If activation loses
+its quorum, the node can retain the snapshot for recovery while its confirmed
+prefix still ends at the last transaction it delivered.
 
 ZooKeeper 3.7.0's `Learner.shutdown` requests a full database shutdown while
 SNAP synchronization is incomplete. `ZooKeeperServer.shutdown(true)` clears
@@ -29,3 +33,10 @@ all nine safety predicates, types and commit-index bounds. Disabling recovery
 reproduces the retained-temporary-history defect. These finite regressions do
 not establish unbounded safety or complete disk-format fidelity. Proof runs
 using the previous model remain historical results and must not be overwritten.
+
+`tests/fixtures/zookeeper_sync/ConfirmedHistoryReplay.tla` replays a
+five-voter execution in which a leader loses its activation quorum after a
+follower installs its SNAP. It also checks successful activation and a late
+joiner's outstanding proposal with COMMIT on either side of UPTODATE.
+The regression runs against the source model, the shipped module task and
+the isolated PrefixConsistency and Agreement tasks.
