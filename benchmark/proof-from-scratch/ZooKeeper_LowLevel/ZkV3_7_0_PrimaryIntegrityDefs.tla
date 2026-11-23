@@ -9,11 +9,11 @@ PrimaryIntegrity == \A i, j \in Server: /\ IsLeader(i)   /\ IsMyLearner(i, j)
                                         /\ IsFollower(j) /\ IsMyLeader(j, i)
                                         /\ zabState[i] = BROADCAST
                                         /\ zabState[j] = BROADCAST
-                                        /\ lastCommitted[j].index >= 1
-                        => \A idx_j \in 1..lastCommitted[j].index:
-                                \/ history[j][idx_j].zxid[1] >= currentEpoch[i]
-                                \/ /\ history[j][idx_j].zxid[1] < currentEpoch[i]
-                                   /\ \E idx_i \in 1..lastCommitted[i].index: 
-                                        TxnEqual(history[i][idx_i], history[j][idx_j])
+                                        /\ Len(confirmedHistory[j]) >= 1
+                        => \A idx_j \in 1..Len(confirmedHistory[j]):
+                                \/ confirmedHistory[j][idx_j].zxid[1] >= currentEpoch[i]
+                                \/ /\ confirmedHistory[j][idx_j].zxid[1] < currentEpoch[i]
+                                   /\ \E idx_i \in 1..Len(confirmedHistory[i]):
+                                        TxnEqual(confirmedHistory[i][idx_i], confirmedHistory[j][idx_j])
 
 =============================================================================

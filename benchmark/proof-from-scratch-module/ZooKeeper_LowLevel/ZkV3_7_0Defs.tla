@@ -16,43 +16,43 @@ Leadership1 == \A i, j \in Server:
 Leadership2 == \A epoch \in 1..MAXEPOCH: Cardinality(epochLeader[epoch]) <= 1
 
 PrefixConsistency == \A i, j \in Server:
-                        LET smaller == Minimum({lastCommitted[i].index, lastCommitted[j].index})
+                        LET smaller == Minimum({Len(confirmedHistory[i]), Len(confirmedHistory[j])})
                         IN \/ smaller = 0
                            \/ /\ smaller > 0
                               /\ \A index \in 1..smaller:
-                                   TxnEqual(history[i][index], history[j][index])
+                                   TxnEqual(confirmedHistory[i][index], confirmedHistory[j][index])
 
 Integrity == \A i \in Server:
                 /\ IsFollower(i)
-                /\ lastCommitted[i].index > 0
-                => \A idx \in 1..lastCommitted[i].index: \E proposal \in proposalMsgsLog:
+                /\ Len(confirmedHistory[i]) > 0
+                => \A idx \in 1..Len(confirmedHistory[i]): \E proposal \in proposalMsgsLog:
                     LET txn_proposal == [ zxid  |-> proposal.zxid,
                                           value |-> proposal.data ]
-                    IN  TxnEqual(history[i][idx], txn_proposal)
+                    IN  TxnEqual(confirmedHistory[i][idx], txn_proposal)
 
 Agreement == \A i, j \in Server:
-                /\ IsFollower(i) /\ lastCommitted[i].index > 0
-                /\ IsFollower(j) /\ lastCommitted[j].index > 0
+                /\ IsFollower(i) /\ Len(confirmedHistory[i]) > 0
+                /\ IsFollower(j) /\ Len(confirmedHistory[j]) > 0
                 =>
-                \A idx1 \in 1..lastCommitted[i].index, idx2 \in 1..lastCommitted[j].index :
-                    \/ \E idx_j \in 1..lastCommitted[j].index:
-                        TxnEqual(history[j][idx_j], history[i][idx1])
-                    \/ \E idx_i \in 1..lastCommitted[i].index:
-                        TxnEqual(history[i][idx_i], history[j][idx2])
+                \A idx1 \in 1..Len(confirmedHistory[i]), idx2 \in 1..Len(confirmedHistory[j]) :
+                    \/ \E idx_j \in 1..Len(confirmedHistory[j]):
+                        TxnEqual(confirmedHistory[j][idx_j], confirmedHistory[i][idx1])
+                    \/ \E idx_i \in 1..Len(confirmedHistory[i]):
+                        TxnEqual(confirmedHistory[i][idx_i], confirmedHistory[j][idx2])
 
 TotalOrder == \A i, j \in Server: 
-                LET committed1 == lastCommitted[i].index 
-                    committed2 == lastCommitted[j].index  
+                LET committed1 == Len(confirmedHistory[i])
+                    committed2 == Len(confirmedHistory[j])
                 IN committed1 >= 2 /\ committed2 >= 2
                     => \A idx_i1 \in 1..(committed1 - 1) : \A idx_i2 \in (idx_i1 + 1)..committed1 :
                     LET logOk == \E idx \in 1..committed2 :
-                                     TxnEqual(history[i][idx_i2], history[j][idx])
+                                     TxnEqual(confirmedHistory[i][idx_i2], confirmedHistory[j][idx])
                     IN \/ ~logOk 
                        \/ /\ logOk 
                           /\ \E idx_j2 \in 1..committed2 : 
-                                /\ TxnEqual(history[i][idx_i2], history[j][idx_j2])
+                                /\ TxnEqual(confirmedHistory[i][idx_i2], confirmedHistory[j][idx_j2])
                                 /\ \E idx_j1 \in 1..(idx_j2 - 1):
-                                       TxnEqual(history[i][idx_i1], history[j][idx_j1])
+                                       TxnEqual(confirmedHistory[i][idx_i1], confirmedHistory[j][idx_j1])
 
 LocalPrimaryOrder == LET p_set(i, e) == {p \in proposalMsgsLog: /\ p.source = i 
                                                                 /\ p.epoch  = e }
@@ -66,29 +66,29 @@ LocalPrimaryOrder == LET p_set(i, e) == {p \in proposalMsgsLog: /\ p.source = i
                              \/ /\ ~TxnEqual(txn1, txn2)
                                 /\ LET TxnPre  == IF ZxidCompare(txn1.zxid, txn2.zxid) THEN txn2 ELSE txn1
                                        TxnNext == IF ZxidCompare(txn1.zxid, txn2.zxid) THEN txn1 ELSE txn2
-                                   IN \A j \in Server: (\E idx \in 1..lastCommitted[j].index: 
-                                                            TxnEqual(history[j][idx], TxnNext))
-                                        => \E idx2 \in 1..lastCommitted[j].index: 
-                                            /\ TxnEqual(history[j][idx2], TxnNext)
+                                   IN \A j \in Server: (\E idx \in 1..Len(confirmedHistory[j]):
+                                                            TxnEqual(confirmedHistory[j][idx], TxnNext))
+                                        => \E idx2 \in 1..Len(confirmedHistory[j]):
+                                            /\ TxnEqual(confirmedHistory[j][idx2], TxnNext)
                                             /\ idx2 > 1
                                             /\ \E idx1 \in 1..(idx2 - 1): 
-                                                TxnEqual(history[j][idx1], TxnPre)
+                                                TxnEqual(confirmedHistory[j][idx1], TxnPre)
 
-GlobalPrimaryOrder == \A i \in Server: lastCommitted[i].index >= 2
-                         => \A idx1, idx2 \in 1..lastCommitted[i].index:
-                                \/ ~EpochPrecedeInTxn(history[i][idx1], history[i][idx2])
-                                \/ /\ EpochPrecedeInTxn(history[i][idx1], history[i][idx2])
+GlobalPrimaryOrder == \A i \in Server: Len(confirmedHistory[i]) >= 2
+                         => \A idx1, idx2 \in 1..Len(confirmedHistory[i]):
+                                \/ ~EpochPrecedeInTxn(confirmedHistory[i][idx1], confirmedHistory[i][idx2])
+                                \/ /\ EpochPrecedeInTxn(confirmedHistory[i][idx1], confirmedHistory[i][idx2])
                                    /\ idx1 < idx2
 
 PrimaryIntegrity == \A i, j \in Server: /\ IsLeader(i)   /\ IsMyLearner(i, j)
                                         /\ IsFollower(j) /\ IsMyLeader(j, i)
                                         /\ zabState[i] = BROADCAST
                                         /\ zabState[j] = BROADCAST
-                                        /\ lastCommitted[j].index >= 1
-                        => \A idx_j \in 1..lastCommitted[j].index:
-                                \/ history[j][idx_j].zxid[1] >= currentEpoch[i]
-                                \/ /\ history[j][idx_j].zxid[1] < currentEpoch[i]
-                                   /\ \E idx_i \in 1..lastCommitted[i].index: 
-                                        TxnEqual(history[i][idx_i], history[j][idx_j])
+                                        /\ Len(confirmedHistory[j]) >= 1
+                        => \A idx_j \in 1..Len(confirmedHistory[j]):
+                                \/ confirmedHistory[j][idx_j].zxid[1] >= currentEpoch[i]
+                                \/ /\ confirmedHistory[j][idx_j].zxid[1] < currentEpoch[i]
+                                   /\ \E idx_i \in 1..Len(confirmedHistory[i]):
+                                        TxnEqual(confirmedHistory[i][idx_i], confirmedHistory[j][idx_j])
 
 =============================================================================

@@ -32,8 +32,6 @@ LPO_FILES = (
 
 EXISTS_PAIR = r"\E txn1, txn2 \in txn_set"
 FORALL_PAIR = r"\A txn1, txn2 \in txn_set"
-COMMITTED_GUARD = "lastCommitted[j].index >= 2"
-DELIVERED_NEXT = r"(\E idx \in 1..lastCommitted[j].index"
 
 TLC_MODULE = REPO_ROOT / "tests" / "dataset" / "LPOQuantifierCheck.tla"
 TLC_CONFIG = REPO_ROOT / "tests" / "dataset" / "LPOQuantifierCheck.cfg"
@@ -56,8 +54,11 @@ def test_local_primary_order_quantifies_over_every_broadcast_pair():
         body = _local_primary_order_body(path.read_text(encoding="utf-8"))
         assert EXISTS_PAIR not in body, f"{path} still uses existential pair quantification"
         assert FORALL_PAIR in body, f"{path} is missing forall-pairs LocalPrimaryOrder"
-        assert COMMITTED_GUARD not in body, f"{path} still skips followers with lastCommitted index 1"
-        assert DELIVERED_NEXT in body, f"{path} must parenthesize the delivery check so \\E does not bind =>"
+        bound = "Len(confirmedHistory[j])" if path.parent.name == "ZooKeeper_LowLevel" else "lastCommitted[j].index"
+        assert f"{bound} >= 2" not in body, f"{path} still skips followers with just one delivery"
+        assert rf"(\E idx \in 1..{bound}" in body, (
+            f"{path} must parenthesize the delivery check so \\E does not bind =>"
+        )
 
 
 def test_local_primary_order_fails_when_follower_delivered_only_b():

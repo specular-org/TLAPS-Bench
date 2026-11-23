@@ -7,10 +7,10 @@ TxnEqual(txn1, txn2) == /\ ZxidEqual(txn1.zxid, txn2.zxid)
 
 Integrity == \A i \in Server:
                 /\ IsFollower(i)
-                /\ lastCommitted[i].index > 0
-                => \A idx \in 1..lastCommitted[i].index: \E proposal \in proposalMsgsLog:
+                /\ Len(confirmedHistory[i]) > 0
+                => \A idx \in 1..Len(confirmedHistory[i]): \E proposal \in proposalMsgsLog:
                     LET txn_proposal == [ zxid  |-> proposal.zxid,
                                           value |-> proposal.data ]
-                    IN  TxnEqual(history[i][idx], txn_proposal)
+                    IN  TxnEqual(confirmedHistory[i][idx], txn_proposal)
 
 =============================================================================
