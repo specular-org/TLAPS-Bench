@@ -54,10 +54,8 @@ VARIABLES zabState,      \* Current phase of server, in
                          \* {ELECTION, DISCOVERY, SYNCHRONIZATION, BROADCAST}.
           acceptedEpoch, \* Epoch of the last LEADERINFO packet accepted,
                          \* namely f.p in paper.
-          lastCommitted, \* Maximum index and zxid known to be committed,
-                         \* namely 'lastCommitted' in Leader. Starts after the
-                         \* common bootstrap entry,
-                         \* and increases monotonically before restarting.
+          lastCommitted, \* Local database cursor. During sync/recovery its
+                         \* contents can still be replaced before activation.
           lastSnapshot,  \* Index and zxid corresponding to latest snapshot
                          \* from data tree.
           initialHistory \* history that server initially has before election.
@@ -119,7 +117,8 @@ VARIABLES status,    \* Whether the server is online or offline.
 
 \* Variables only used in verifying properties.
 VARIABLES epochLeader,       \* Set of leaders in every epoch.
-          proposalMsgsLog   \* Set of all broadcast messages.
+          proposalMsgsLog,   \* Set of all broadcast messages.
+          confirmedHistory   \* Prefix each server has confirmed through activation or commit.
 \* Variables only used for looking.                             
 \*VARIABLE currentVote,   \* Info of current vote, namely 'currentVote'
 \*                        \* in QuorumPeer.
@@ -148,7 +147,7 @@ electionVars == electionVarsL
 leaderVars == <<leadingVoteSet, learners, connecting, electing, 
                  ackldRecv, forwarding, tempMaxEpoch>>                                           
 followerVars == <<connectInfo, packetsSync>>                
-verifyVars == <<proposalMsgsLog, epochLeader>>
+verifyVars == <<proposalMsgsLog, epochLeader, confirmedHistory>>
 msgVars == <<msgs, electionMsgs>>
 envVars == <<status, partition>>                        
 
@@ -166,6 +165,12 @@ HistoryItem ==
        ackSid: SUBSET Server,
        epoch: Nat ]    
     
+TxnPrefix(log, end) ==
+    [k \in 1..end |-> [zxid |-> log[k].zxid, value |-> log[k].value]]
+
+\* Take identities from the local log at the confirmation event. Later SNAP,\n\* TRUNC and restart can change that log before the next activation.\nConfirmPrefix(i, log, end) ==
+    confirmedHistory' = [confirmedHistory EXCEPT ![i] = TxnPrefix(log, end)]
+
 Proposal ==
     [ source: Server, 
       epoch: Nat,
@@ -252,6 +257,7 @@ TypeOK ==
     /\ packetsSync \in [Server -> SyncPackets]
     /\ status \in [Server -> {ONLINE, OFFLINE}]
     /\ partition \in [Server -> [Server -> BOOLEAN ]]
+    /\ confirmedHistory \in [Server -> Seq([zxid: Zxid, value: Value])]
     /\ proposalMsgsLog \in SUBSET Proposal
     /\ epochLeader \in [1..MAXEPOCH -> SUBSET Server]
     /\ msgs \in [Server -> [Server -> Seq(Message)]]
@@ -408,7 +414,8 @@ InitFollowerVars == /\ connectInfo = [s \in Server |-> [sid |-> NullPoint,
                                         [ notCommitted |-> << >>,
                                           committed    |-> << >> ] ]
 
-InitVerifyVars == /\ proposalMsgsLog    = BootstrapProposalMsgs
+InitVerifyVars == /\ confirmedHistory   = [s \in Server |-> TxnPrefix(<<BootstrapTxn>>, 1)]
+                  /\ proposalMsgsLog    = BootstrapProposalMsgs
                   /\ epochLeader        = [e \in 1..MAXEPOCH |-> {} ]
                    
 InitMsgVars == /\ msgs         = [s \in Server |-> [v \in Server |-> << >>] ]
@@ -759,7 +766,7 @@ LeaderProcessFOLLOWERINFO(i, j) ==
                  /\ UNCHANGED <<tempMaxEpoch, connecting, acceptedEpoch>>
         /\ UNCHANGED <<state, currentEpoch, lastProcessed, zabState, history, lastCommitted, 
                        followerVars, electionVars, initialHistory, leadingVoteSet, learners, 
-                       electing, ackldRecv, forwarding, proposalMsgsLog, epochLeader, 
+                       electing, ackldRecv, forwarding, verifyVars,
                        lastSnapshot, electionMsgs, envVars>>
         
 (* Follower receives LEADERINFO. If newEpoch >= acceptedEpoch, then follower 
@@ -805,7 +812,7 @@ FollowerProcessLEADERINFO(i, j) ==
                     /\ RemoveLearner(connectInfo[i].sid, i)
                     /\ UNCHANGED <<acceptedEpoch>>
         /\ UNCHANGED <<tempMaxEpoch, initialHistory, lastSnapshot,
-                       proposalMsgsLog, epochLeader, packetsSync, envVars>>
+                       verifyVars, packetsSync, envVars>>
 -----------------------------------------------------------------------------    
 UpdateAckSidHelper(his, cur, end, target) ==
         LET updateTxn(txn) == [ zxid   |-> txn.zxid,
@@ -888,6 +895,8 @@ SerializeSnapshot(i, idx) == IF idx <= 0 THEN << >>
    for details. For proposals in committedLog and toBeApplied, send <PROPOSAL,
    COMMIT>. For proposals in outstandingProposals, send PROPOSAL only. *)
 SendSyncMsgs(i, j, lastSeenZxid, lastSeenIndex, mode, needRemoveHead) ==
+        \* Before leader activation these packets describe the selected recovery log.
+        \* In broadcast, outstanding proposals are sent without a COMMIT.
         /\ LET lastCommittedIndex == IF zabState[i] = BROADCAST 
                                      THEN lastCommitted[i].index
                                      ELSE Len(history[i])
@@ -1081,7 +1090,7 @@ LeaderProcessACKEPOCH(i, j) ==
                                 /\ LeaderShutdown(i)
                                 /\ UNCHANGED <<electing, epochLeader>>
         /\ UNCHANGED <<acceptedEpoch, lastCommitted, lastSnapshot, connecting, ackldRecv,
-                       tempMaxEpoch, initialHistory, packetsSync, proposalMsgsLog, envVars>>
+                       tempMaxEpoch, initialHistory, packetsSync, proposalMsgsLog, confirmedHistory, envVars>>
 
 \* Strip syncFollower from LeaderProcessACKEPOCH.
 \* Only when electionFinished = true and there exists some
@@ -1108,7 +1117,7 @@ LeaderSyncFollower(i, j) ==
         /\ UNCHANGED <<state, currentEpoch, lastProcessed, zabState, acceptedEpoch, 
                     lastCommitted, initialHistory, electionVars, leadingVoteSet,
                     learners, connecting, ackldRecv, tempMaxEpoch, followerVars, 
-                    lastSnapshot, epochLeader, electionMsgs, envVars>>
+                    lastSnapshot, epochLeader, confirmedHistory, electionMsgs, envVars>>
 
 TruncateLog(his, index) == IF index <= 0 THEN << >>
                            ELSE SubSeq(his, 1, index)
@@ -1132,7 +1141,9 @@ FollowerProcessSyncMessageOK(i, j) ==
                  \/ /\ stateOk
                     /\ \/ /\ msg.mtype = DIFF
                           /\ connectInfo' = [connectInfo EXCEPT ![i].syncMode = DIFF]         
-                          /\ UNCHANGED <<history, initialHistory, lastProcessed, lastCommitted>>
+                          \* DIFF retains the peer's existing log as the sync base.
+                          /\ lastCommitted' = [lastCommitted EXCEPT ![i] = EndOfHistory(history[i])]
+                          /\ UNCHANGED <<history, initialHistory, lastProcessed>>
                        \/ /\ msg.mtype = TRUNC
                           /\ connectInfo' = [connectInfo EXCEPT ![i].syncMode = TRUNC]
                           /\ LET truncZxid  == msg.mtruncZxid
@@ -1164,7 +1175,7 @@ FollowerProcessSyncMessageOK(i, j) ==
         /\ Discard(j, i)
         /\ UNCHANGED <<state, currentEpoch, zabState, acceptedEpoch, electionVars,
                        leaderVars, tempMaxEpoch, packetsSync, lastSnapshot,
-                       proposalMsgsLog, epochLeader, electionMsgs, envVars>>
+                       verifyVars, electionMsgs, envVars>>
 
 \* See variable snapshotNeeded in Learner for details.
 \* Learner.syncWithLeader exits on failed truncateLog; it cannot acknowledge
@@ -1258,24 +1269,9 @@ LastCommitted(i) == IF zabState[i] = BROADCAST THEN lastCommitted[i]
                             LET completeHis == history[i] \o packetsSync[i].notCommitted
                                 packetsCommitted == packetsSync[i].committed
                                 lenCommitted == Len(packetsCommitted)
-                            IN IF lenCommitted = 0 \* return last one in history
-                               THEN LET lastIndex == Len(history[i])
-                                        lastInitialIndex == Len(initialHistory[i])
-                                    IN IF lastIndex = lastInitialIndex
-                                       THEN IF lastIndex = 0
-                                            THEN [ index |-> 0,
-                                                   zxid  |-> <<0, 0>> ]
-                                            ELSE [ index |-> lastIndex ,
-                                                   zxid  |-> history[i][lastIndex].zxid ]
-                                       ELSE IF lastInitialIndex < lastCommitted[i].index
-                                            THEN lastCommitted[i]
-                                            ELSE IF lastInitialIndex = 0
-                                                 THEN [ index |-> 0,
-                                                        zxid  |-> <<0, 0>> ]
-                                                 ELSE [ index |-> lastInitialIndex,
-                                                        zxid  |-> history[i][lastInitialIndex].zxid ]
-                               ELSE                \* return tail of packetsCommitted
-                                    LET committedIndex == ZxidToIndex(completeHis, 
+                            IN IF lenCommitted = 0
+                               THEN lastCommitted[i]
+                               ELSE LET committedIndex == ZxidToIndex(completeHis,
                                                      packetsCommitted[lenCommitted] )
                                     IN [ index |-> committedIndex, 
                                          zxid  |-> packetsCommitted[lenCommitted] ]
@@ -1327,7 +1323,7 @@ FollowerProcessCOMMITInSync(i, j) ==
         /\ Discard(j, i)
         /\ UNCHANGED <<state, currentEpoch, zabState, acceptedEpoch,
                        lastSnapshot, initialHistory, electionVars, leaderVars,
-                       connectInfo, epochLeader, proposalMsgsLog, electionMsgs, envVars>>
+                       connectInfo, verifyVars, electionMsgs, envVars>>
 
 \* Assuming that everytime committing two txns, node takes snapshot.
 ShouldSnapshot(i) == lastCommitted[i].index - lastSnapshot[i].index >= 2
@@ -1370,7 +1366,7 @@ FollowerProcessNEWLEADER(i, j) ==
               /\ DiscardAndSendPackets(i, j, queue_toSend)
         /\ UNCHANGED <<state, lastProcessed, zabState, acceptedEpoch, lastCommitted, 
                        electionVars, leaderVars, initialHistory,
-                       proposalMsgsLog, epochLeader, electionMsgs, envVars>>
+                       verifyVars, electionMsgs, envVars>>
 
 \* quorumFormed in Leader
 QuorumFormed(i, set) == i \in set /\ IsQuorum(set)
@@ -1384,6 +1380,7 @@ StartZkServer(i) ==
         IN /\ lastCommitted' = [lastCommitted EXCEPT ![i] = latest]
            /\ lastProcessed' = [lastProcessed EXCEPT ![i] = latest]
            /\ lastSnapshot'  = [lastSnapshot  EXCEPT ![i] = latest]
+           /\ ConfirmPrefix(i, history[i], latest.index)
            /\ UpdateElectionVote(i, acceptedEpoch[i])
 
 LeaderTurnToBroadcast(i) ==
@@ -1407,7 +1404,7 @@ LeaderProcessACKLD(i, j) ==
               /\ \/ \* just reply UPTODATE.
                     /\ QuorumFormed(i, sid_ackldRecv)
                     /\ Reply(i, j, m_uptodate)
-                    /\ UNCHANGED <<ackldRecv, zabState, lastCommitted, lastProcessed,
+                    /\ UNCHANGED <<confirmedHistory, ackldRecv, zabState, lastCommitted, lastProcessed,
                                    lastSnapshot, currentVote>>
                  \/ /\ ~QuorumFormed(i, sid_ackldRecv)
                     /\ \/ /\ match
@@ -1422,11 +1419,11 @@ LeaderProcessACKLD(i, j) ==
                              \/ \* still wait in waitForNewLeaderAck.
                                 /\ ~QuorumFormed(i, new_sid_ackldRecv)
                                 /\ Discard(j, i)
-                                /\ UNCHANGED <<zabState, lastCommitted, lastProcessed,
+                                /\ UNCHANGED <<confirmedHistory, zabState, lastCommitted, lastProcessed,
                                                lastSnapshot, currentVote>>
                        \/ /\ ~match
                           /\ Discard(j, i)
-                          /\ UNCHANGED <<ackldRecv, zabState, lastCommitted, 
+                          /\ UNCHANGED <<confirmedHistory, ackldRecv, zabState, lastCommitted,
                                          lastSnapshot, lastProcessed, currentVote>>
         /\ UNCHANGED <<state, currentEpoch, acceptedEpoch, history, logicalClock, receiveVotes, 
                     outOfElection, recvQueue, waitNotmsg, leadingVoteSet, learners, connecting, 
@@ -1501,6 +1498,8 @@ FollowerCommitInBatches(i) ==
 FollowerProcessUPTODATE(i, j) ==
         /\ IsON(i)
         /\ IsFollower(i)
+        /\ zabState[i] = SYNCHRONIZATION
+        /\ connectInfo[i].nlRcv
         /\ PendingUPTODATE(i, j)
         /\ LET msg == msgs[j][i][1]
                infoOk == IsMyLeader(i, j)
@@ -1511,6 +1510,7 @@ FollowerProcessUPTODATE(i, j) ==
               /\ UpdateElectionVote(i, acceptedEpoch[i])
               /\ FollowerLogRequestInBatches(i, j, ms_ack, packetsNotCommitted)
               /\ FollowerCommitInBatches(i)
+              /\ ConfirmPrefix(i, history'[i], lastCommitted'[i].index)
               /\ packetsSync' = [packetsSync EXCEPT ![i].notCommitted = << >>,
                                                     ![i].committed = << >> ]
               /\ zabState' = [zabState EXCEPT ![i] = BROADCAST ]
@@ -1558,7 +1558,7 @@ LeaderProcessRequest(i) ==
               /\ proposalMsgsLog' = proposalMsgsLog \union {m_proposal_for_checking}
         /\ UNCHANGED <<state, currentEpoch, lastProcessed, zabState, acceptedEpoch,
                        lastCommitted, electionVars, leaderVars, followerVars,
-                       initialHistory, epochLeader, electionMsgs, envVars>>
+                       initialHistory, epochLeader, confirmedHistory, electionMsgs, envVars>>
 
 (* Follower processes PROPOSAL in BROADCAST. See processPacket
    in Follower for details. *)
@@ -1588,7 +1588,7 @@ FollowerProcessPROPOSAL(i, j) ==
                    /\ UNCHANGED <<history, lastSnapshot, msgs>>
         /\ UNCHANGED <<state, currentEpoch, lastProcessed, zabState, acceptedEpoch,
                  lastCommitted, electionVars, leaderVars, followerVars, initialHistory,
-                 epochLeader, proposalMsgsLog, electionMsgs, envVars>>
+                 verifyVars, electionMsgs, envVars>>
 
 \* See outstandingProposals in Leader
 OutstandingProposals(i) == IF zabState[i] /= BROADCAST THEN << >>
@@ -1603,6 +1603,7 @@ LastAckIndexFromFollower(i, j) ==
 LeaderCommit(s, follower, index, zxid) ==
         /\ lastCommitted' = [lastCommitted EXCEPT ![s] = [ index |-> index,
                                                            zxid  |-> zxid ] ]
+        /\ ConfirmPrefix(s, history[s], index)
         /\ LET m_commit == [ mtype |-> COMMIT,
                              mzxid |-> zxid ]
            IN DiscardAndBroadcast(s, follower, m_commit)
@@ -1625,7 +1626,7 @@ LeaderTryToCommit(s, index, zxid, newTxn, follower) ==
                  \/ ~allTxnsBeforeCommitted
                  \/ ~hasAllQuorums
               /\ Discard(follower, s)
-              /\ UNCHANGED <<lastCommitted, lastProcessed>>
+              /\ UNCHANGED <<lastCommitted, lastProcessed, confirmedHistory>>
            \/ /\ allTxnsBeforeCommitted
               /\ hasAllQuorums
               /\ \/ /\ ~ordered
@@ -1670,14 +1671,14 @@ LeaderProcessACK(i, j) ==
                                 \/ ~outstanding
                                 \/ hasCommitted
                              /\ Discard(j, i)
-                             /\ UNCHANGED <<lastCommitted, lastProcessed>>
+                             /\ UNCHANGED <<lastCommitted, lastProcessed, confirmedHistory>>
                           \/ /\ outstanding
                              /\ ~hasCommitted
                              /\ LeaderTryToCommit(i, index, msg.mzxid, txnAfterAddAck, j)
                  \/ /\ \/ ~exist
                        \/ ~monotonicallyInc
                     /\ Discard(j, i)
-                    /\ UNCHANGED <<history, lastCommitted, lastProcessed>>
+                    /\ UNCHANGED <<history, lastCommitted, lastProcessed, confirmedHistory>>
         /\ UNCHANGED <<state, currentEpoch, zabState, acceptedEpoch, electionVars,
                     leaderVars, initialHistory, followerVars, proposalMsgsLog, epochLeader, 
                     lastSnapshot, electionMsgs, envVars>>
@@ -1696,17 +1697,18 @@ FollowerProcessCOMMIT(i, j) ==
            IN
            /\ infoOk 
            /\ \/ /\ noPending
-                 /\ UNCHANGED <<lastCommitted, lastProcessed>>
+                 /\ UNCHANGED <<lastCommitted, lastProcessed, confirmedHistory>>
               \/ /\ ~noPending
                  /\ LET firstElementZxid == pendingTxns[1].zxid
                         match == ZxidEqual(firstElementZxid, msg.mzxid)
                     IN 
                     \/ /\ ~match
-                       /\ UNCHANGED <<lastCommitted, lastProcessed>>
+                       /\ UNCHANGED <<lastCommitted, lastProcessed, confirmedHistory>>
                     \/ /\ match
                        /\ lastCommitted' = [lastCommitted EXCEPT 
                                 ![i] = [ index |-> lastCommitted[i].index + 1,
                                          zxid  |-> firstElementZxid ] ]
+                       /\ ConfirmPrefix(i, history[i], lastCommitted'[i].index)
                        /\ lastProcessed' = [lastProcessed EXCEPT 
                                 ![i] = [ index |-> lastCommitted[i].index + 1,
                                          zxid  |-> firstElementZxid ] ]
@@ -1772,11 +1774,11 @@ PROOF OBVIOUS
 \* PrefixConsistency: The prefix that have been committed 
 \* in history in any process is the same.
 PrefixConsistency == \A i, j \in Server:
-                        LET smaller == Minimum({lastCommitted[i].index, lastCommitted[j].index})
+                        LET smaller == Minimum({Len(confirmedHistory[i]), Len(confirmedHistory[j])})
                         IN \/ smaller = 0
                            \/ /\ smaller > 0
                               /\ \A index \in 1..smaller:
-                                   TxnEqual(history[i][index], history[j][index])
+                                   TxnEqual(confirmedHistory[i][index], confirmedHistory[j][index])
 
 THEOREM Spec => []PrefixConsistency
 PROOF OBVIOUS
@@ -1784,11 +1786,11 @@ PROOF OBVIOUS
 \* Integrity: If some follower delivers one transaction, then some primary has broadcast it.
 Integrity == \A i \in Server:
                 /\ IsFollower(i)
-                /\ lastCommitted[i].index > 0
-                => \A idx \in 1..lastCommitted[i].index: \E proposal \in proposalMsgsLog:
+                /\ Len(confirmedHistory[i]) > 0
+                => \A idx \in 1..Len(confirmedHistory[i]): \E proposal \in proposalMsgsLog:
                     LET txn_proposal == [ zxid  |-> proposal.zxid,
                                           value |-> proposal.data ]
-                    IN  TxnEqual(history[i][idx], txn_proposal)
+                    IN  TxnEqual(confirmedHistory[i][idx], txn_proposal)
 
 \* Agreement: If some follower f delivers transaction a and some follower f' delivers transaction b,
 
@@ -1798,14 +1800,14 @@ PROOF OBVIOUS
 \* Agreement: If some follower f delivers transaction a and some follower f' delivers transaction b,
 \*            then f' delivers a or f delivers b.
 Agreement == \A i, j \in Server:
-                /\ IsFollower(i) /\ lastCommitted[i].index > 0
-                /\ IsFollower(j) /\ lastCommitted[j].index > 0
+                /\ IsFollower(i) /\ Len(confirmedHistory[i]) > 0
+                /\ IsFollower(j) /\ Len(confirmedHistory[j]) > 0
                 =>
-                \A idx1 \in 1..lastCommitted[i].index, idx2 \in 1..lastCommitted[j].index :
-                    \/ \E idx_j \in 1..lastCommitted[j].index:
-                        TxnEqual(history[j][idx_j], history[i][idx1])
-                    \/ \E idx_i \in 1..lastCommitted[i].index:
-                        TxnEqual(history[i][idx_i], history[j][idx2])
+                \A idx1 \in 1..Len(confirmedHistory[i]), idx2 \in 1..Len(confirmedHistory[j]) :
+                    \/ \E idx_j \in 1..Len(confirmedHistory[j]):
+                        TxnEqual(confirmedHistory[j][idx_j], confirmedHistory[i][idx1])
+                    \/ \E idx_i \in 1..Len(confirmedHistory[i]):
+                        TxnEqual(confirmedHistory[i][idx_i], confirmedHistory[j][idx2])
 
 \* Total order: If some follower delivers a before b, then any process that delivers b
 
@@ -1815,18 +1817,18 @@ PROOF OBVIOUS
 \* Total order: If some follower delivers a before b, then any process that delivers b
 \*              must also deliver a and deliver a before b.
 TotalOrder == \A i, j \in Server: 
-                LET committed1 == lastCommitted[i].index 
-                    committed2 == lastCommitted[j].index  
+                LET committed1 == Len(confirmedHistory[i])
+                    committed2 == Len(confirmedHistory[j])
                 IN committed1 >= 2 /\ committed2 >= 2
                     => \A idx_i1 \in 1..(committed1 - 1) : \A idx_i2 \in (idx_i1 + 1)..committed1 :
                     LET logOk == \E idx \in 1..committed2 :
-                                     TxnEqual(history[i][idx_i2], history[j][idx])
+                                     TxnEqual(confirmedHistory[i][idx_i2], confirmedHistory[j][idx])
                     IN \/ ~logOk 
                        \/ /\ logOk 
                           /\ \E idx_j2 \in 1..committed2 : 
-                                /\ TxnEqual(history[i][idx_i2], history[j][idx_j2])
+                                /\ TxnEqual(confirmedHistory[i][idx_i2], confirmedHistory[j][idx_j2])
                                 /\ \E idx_j1 \in 1..(idx_j2 - 1):
-                                       TxnEqual(history[i][idx_i1], history[j][idx_j1])
+                                       TxnEqual(confirmedHistory[i][idx_i1], confirmedHistory[j][idx_j1])
 
 \* Local primary order: If a primary broadcasts a before it broadcasts b, then a follower that
 
@@ -1847,13 +1849,13 @@ LocalPrimaryOrder == LET p_set(i, e) == {p \in proposalMsgsLog: /\ p.source = i
                              \/ /\ ~TxnEqual(txn1, txn2)
                                 /\ LET TxnPre  == IF ZxidCompare(txn1.zxid, txn2.zxid) THEN txn2 ELSE txn1
                                        TxnNext == IF ZxidCompare(txn1.zxid, txn2.zxid) THEN txn1 ELSE txn2
-                                   IN \A j \in Server: (\E idx \in 1..lastCommitted[j].index: 
-                                                            TxnEqual(history[j][idx], TxnNext))
-                                        => \E idx2 \in 1..lastCommitted[j].index: 
-                                            /\ TxnEqual(history[j][idx2], TxnNext)
+                                   IN \A j \in Server: (\E idx \in 1..Len(confirmedHistory[j]):
+                                                            TxnEqual(confirmedHistory[j][idx], TxnNext))
+                                        => \E idx2 \in 1..Len(confirmedHistory[j]):
+                                            /\ TxnEqual(confirmedHistory[j][idx2], TxnNext)
                                             /\ idx2 > 1
                                             /\ \E idx1 \in 1..(idx2 - 1): 
-                                                TxnEqual(history[j][idx1], TxnPre)
+                                                TxnEqual(confirmedHistory[j][idx1], TxnPre)
 
 \* Global primary order: A follower f delivers both a with epoch e and b with epoch e', and e < e',
 
@@ -1862,10 +1864,10 @@ PROOF OBVIOUS
 
 \* Global primary order: A follower f delivers both a with epoch e and b with epoch e', and e < e',
 \*                       then f must deliver a before b.
-GlobalPrimaryOrder == \A i \in Server: lastCommitted[i].index >= 2
-                         => \A idx1, idx2 \in 1..lastCommitted[i].index:
-                                \/ ~EpochPrecedeInTxn(history[i][idx1], history[i][idx2])
-                                \/ /\ EpochPrecedeInTxn(history[i][idx1], history[i][idx2])
+GlobalPrimaryOrder == \A i \in Server: Len(confirmedHistory[i]) >= 2
+                         => \A idx1, idx2 \in 1..Len(confirmedHistory[i]):
+                                \/ ~EpochPrecedeInTxn(confirmedHistory[i][idx1], confirmedHistory[i][idx2])
+                                \/ /\ EpochPrecedeInTxn(confirmedHistory[i][idx1], confirmedHistory[i][idx2])
                                    /\ idx1 < idx2
 
 \* Primary integrity: If primary p broadcasts a and some follower f delivers b such that b has epoch
@@ -1879,12 +1881,12 @@ PrimaryIntegrity == \A i, j \in Server: /\ IsLeader(i)   /\ IsMyLearner(i, j)
                                         /\ IsFollower(j) /\ IsMyLeader(j, i)
                                         /\ zabState[i] = BROADCAST
                                         /\ zabState[j] = BROADCAST
-                                        /\ lastCommitted[j].index >= 1
-                        => \A idx_j \in 1..lastCommitted[j].index:
-                                \/ history[j][idx_j].zxid[1] >= currentEpoch[i]
-                                \/ /\ history[j][idx_j].zxid[1] < currentEpoch[i]
-                                   /\ \E idx_i \in 1..lastCommitted[i].index: 
-                                        TxnEqual(history[i][idx_i], history[j][idx_j])
+                                        /\ Len(confirmedHistory[j]) >= 1
+                        => \A idx_j \in 1..Len(confirmedHistory[j]):
+                                \/ confirmedHistory[j][idx_j].zxid[1] >= currentEpoch[i]
+                                \/ /\ confirmedHistory[j][idx_j].zxid[1] < currentEpoch[i]
+                                   /\ \E idx_i \in 1..Len(confirmedHistory[i]):
+                                        TxnEqual(confirmedHistory[i][idx_i], confirmedHistory[j][idx_j])
 
 THEOREM Spec => []PrimaryIntegrity
 PROOF OBVIOUS

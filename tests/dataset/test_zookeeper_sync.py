@@ -114,3 +114,33 @@ INVARIANTS Rejected Replaced IndexBounds
     (tmp_path / "check.log").write_text(output)
     assert result.returncode == 0, output
     assert "128 distinct states found" in output
+
+
+@pytest.mark.parametrize("scenario", ["interrupted", "activated", "early-commit", "late-commit"])
+def test_confirmed_history(tmp_path, scenario):
+    if not shutil.which("java") or not (LIB / "tla2tools.jar").is_file():
+        pytest.skip("TLC dependencies are not installed")
+    for module in ["FastLeaderElection", "ZkV3_7_0"]:
+        shutil.copy(REPO / f"source/ZooKeeper_LowLevel/{module}.tla", tmp_path)
+    shutil.copy(REPO / "tests/fixtures/zookeeper_sync/ConfirmedHistoryReplay.tla", tmp_path)
+    config = f'''SPECIFICATION TraceSpec
+CONSTANTS B=B C=C D=D E=E T=T Server={{B,C,D,E,T}} NullPoint=NullPoint MAXEPOCH=3
+Scenario="{scenario}"
+Value <- RequestValues
+CHECK_DEADLOCK FALSE
+PROPERTY Spec Completed KeepsConfirmed
+INVARIANTS TypeOK ServingMatches Checkpoints Leadership1 Leadership2 PrefixConsistency
+           Integrity Agreement TotalOrder LocalPrimaryOrder GlobalPrimaryOrder PrimaryIntegrity
+'''
+    (tmp_path / "ConfirmedHistoryReplay.cfg").write_text(config)
+    cp = os.pathsep.join(str(LIB / name) for name in ["tla2tools.jar", "community", "tlapm"])
+    result = subprocess.run(
+        ["java", "-XX:+UseParallelGC", "-Xmx1g", "-cp", cp, "tlc2.TLC", "-workers", "1", "ConfirmedHistoryReplay"],
+        cwd=tmp_path,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        timeout=60,
+    )
+    (tmp_path / "check.log").write_text(result.stdout)
+    assert result.returncode == 0, result.stdout
