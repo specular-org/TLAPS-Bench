@@ -168,7 +168,9 @@ HistoryItem ==
 TxnPrefix(log, end) ==
     [k \in 1..end |-> [zxid |-> log[k].zxid, value |-> log[k].value]]
 
-\* Take identities from the local log at the confirmation event. Later SNAP,\n\* TRUNC and restart can change that log before the next activation.\nConfirmPrefix(i, log, end) ==
+\* Take identities from the local log at the confirmation event. Later SNAP,
+\* TRUNC and restart can change that log before the next activation.
+ConfirmPrefix(i, log, end) ==
     confirmedHistory' = [confirmedHistory EXCEPT ![i] = TxnPrefix(log, end)]
 
 Proposal ==
