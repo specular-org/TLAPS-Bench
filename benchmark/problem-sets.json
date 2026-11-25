@@ -135,12 +135,6 @@
     "tasks": [
       "CCF/CCFProof.tla",
       "PirateShip/PirateShipProof.tla"
-    ],
-    "pending": [
-      {
-        "name": "Wildfire",
-        "pull_request": "https://github.com/specular-org/TLAPS-Bench/pull/164"
-      }
     ]
   }
 }
