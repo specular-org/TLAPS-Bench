@@ -592,7 +592,7 @@ def test_copilot_uses_documented_prompt_flag_without_stdin(tmp_path):
     assert stdin_data is None
 
 
-def test_copilot_cli_install_uses_latest_release():
+def test_copilot_cli_install_uses_pinned_release():
     script = Path("docker/install-scripts/install-copilot.sh").read_text()
 
-    assert "npm install -g @github/copilot --cache" in script
+    assert "npm install -g @github/copilot@1.0.114 --cache" in script

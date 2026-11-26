@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import threading
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 
 import pytest
 
@@ -105,6 +107,67 @@ def _fake_openai_server():
         thread.join(timeout=5)
 
 
+def _tail(text: str, lines: int = 40) -> str:
+    return "\n".join(line[:300] for line in text.splitlines()[-lines:]) or "<empty>"
+
+
+def _listing(root: Path) -> str:
+    files = [
+        f"{path.relative_to(root)} ({path.stat().st_size} bytes)" for path in sorted(root.rglob("*")) if path.is_file()
+    ]
+    return "\n".join(files) or "<no files>"
+
+
+def _run_for_report(args: list[str], **kwargs) -> str:
+    try:
+        run = subprocess.run(args, capture_output=True, text=True, timeout=45, **kwargs)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return f"<{type(exc).__name__}: {exc}>"
+    return f"exit={run.returncode}\n--- stdout ---\n{_tail(run.stdout)}\n--- stderr ---\n{_tail(run.stderr)}"
+
+
+def _missing_otel_report(binary, invocation, env, workspace, tmp_path, result) -> str:
+    """Describe a successful Copilot run that wrote no OTel file, rerunning once with CLI logs enabled."""
+    log_dir = tmp_path / "copilot-logs"
+    debug_dir = tmp_path / "debug-results"
+    debug_dir.mkdir()
+    debug_invocation = list(invocation)
+    level = debug_invocation.index("--log-level")
+    debug_invocation[level + 1] = "all"
+    debug_invocation[level:level] = ["--log-dir", str(log_dir)]
+    debug_env = {**env, "COPILOT_OTEL_FILE_EXPORTER_PATH": str(debug_dir / COPILOT_OTEL_FILENAME)}
+    debug_run = _run_for_report(debug_invocation, cwd=workspace, env=debug_env)
+    logs = (
+        "\n".join(path.read_text(errors="replace") for path in sorted(log_dir.rglob("*")) if path.is_file())
+        if log_dir.is_dir()
+        else ""
+    )
+    otel_lines = "\n".join(
+        line
+        for line in logs.splitlines()
+        if re.search(r"otel|opentelemetry|exporter|span", line, re.I)
+        and not re.search(r"github_telemetry|sdk_diagnostics", line)
+    )
+    otel_env = {key: value for key, value in env.items() if key.startswith(("COPILOT_OTEL", "OTEL_"))}
+    host_keys = sorted(key for key in os.environ if key.startswith(("COPILOT", "OTEL", "GH_", "GITHUB_")))
+    return "\n".join(
+        [
+            "Copilot CLI exited 0 but wrote no OTel file.",
+            f"version: {_run_for_report([binary, '--version'], env=env)}",
+            f"OTel env: {otel_env}",
+            f"host env keys: {host_keys}",
+            f"--- first run stdout ---\n{_tail(result.stdout)}",
+            f"--- first run stderr ---\n{_tail(result.stderr)}",
+            f"--- result dir ---\n{_listing(tmp_path / 'results')}",
+            f"--- copilot home ---\n{_listing(tmp_path / 'copilot-home')}",
+            f"--- debug rerun ---\n{debug_run}",
+            f"--- debug result dir ---\n{_listing(debug_dir)}",
+            f"--- debug log OTel lines ---\n{_tail(otel_lines, 80)}",
+            f"--- debug log tail ---\n{_tail(logs, 60)}",
+        ]
+    )
+
+
 @pytest.mark.skipif(
     COPILOT_BINARY is None and not REQUIRE_COPILOT_CLI,
     reason="installed Copilot CLI lacks the current benchmark interface",
@@ -152,12 +215,13 @@ def test_real_copilot_cli_writes_isolated_otel_with_prompt_flag(tmp_path):
             cwd=workspace,
             env=env,
         )
+        otel_path = result_dir / COPILOT_OTEL_FILENAME
+        if result.returncode == 0 and not (otel_path.is_file() and otel_path.stat().st_size > 0):
+            pytest.fail(_missing_otel_report(binary, invocation, env, workspace, tmp_path, result))
 
     assert result.returncode == 0, result.stderr or result.stdout
     assert stdin_data is None
     assert invocation[-2:] == ["-p", prompt]
-    otel_path = result_dir / COPILOT_OTEL_FILENAME
-    assert otel_path.is_file() and otel_path.stat().st_size > 0
 
     raw_events = [json.loads(line) for line in otel_path.read_text().splitlines()]
     operations = {
